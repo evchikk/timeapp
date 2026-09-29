@@ -14,8 +14,17 @@ type Group = {
 
 type Member = {
   user_id: string;
-  email: string;
   joined_at: string;
+  email?: string;
+};
+
+type Availability = {
+  id: string;
+  user_id: string;
+  email: string;
+  title: string;
+  start_time: string;
+  end_time: string;
 };
 
 export default function GroupPage() {
@@ -25,6 +34,7 @@ export default function GroupPage() {
 
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
+  const [availability, setAvailability] = useState<Availability[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
 
@@ -62,7 +72,18 @@ export default function GroupPage() {
         return;
       }
 
-      setMembers((membersData as Member[]) ?? []);
+      setMembers(membersData ?? []);
+
+      // Загружаем занятость всех участников группы
+      const { data: availData, error: availError } = await supabase.rpc(
+        'get_group_availability',
+        { gid: groupId }
+      );
+
+      if (!availError && availData) {
+        setAvailability(availData);
+      }
+
       setLoading(false);
     }
     load();
@@ -133,21 +154,45 @@ export default function GroupPage() {
             Участники ({members.length})
           </h2>
 
-          {members.length === 0 ? (
-            <p className="text-sm text-gray-600">Пока никого нет.</p>
+          <ul className="space-y-2">
+            {members.map((m) => (
+              <li
+                key={m.user_id}
+                className="rounded border border-gray-200 px-3 py-2 text-sm text-gray-700"
+              >
+                {m.email ?? m.user_id}
+                {m.user_id === group.owner_id && (
+                  <span className="ml-2 rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-800">
+                    владелец
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
+          <h2 className="mb-4 text-xl font-semibold">
+            Занятость участников ({availability.length})
+          </h2>
+
+          {availability.length === 0 ? (
+            <p className="text-gray-600">
+              Пока никто не добавил свою занятость.
+            </p>
           ) : (
             <ul className="space-y-2">
-              {members.map((m) => (
+              {availability.map((a) => (
                 <li
-                  key={m.user_id}
-                  className="flex items-center gap-2 rounded border border-gray-200 px-3 py-2 text-sm text-gray-700"
+                  key={a.id}
+                  className="rounded border border-gray-200 p-3 text-sm"
                 >
-                  <span>{m.email}</span>
-                  {m.user_id === group.owner_id && (
-                    <span className="rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-800">
-                      владелец
-                    </span>
-                  )}
+                  <div className="font-medium text-gray-900">{a.title}</div>
+                  <div className="text-gray-600">
+                    {new Date(a.start_time).toLocaleString('ru-RU')} —{' '}
+                    {new Date(a.end_time).toLocaleString('ru-RU')}
+                  </div>
+                  <div className="mt-1 text-xs text-gray-500">{a.email}</div>
                 </li>
               ))}
             </ul>
