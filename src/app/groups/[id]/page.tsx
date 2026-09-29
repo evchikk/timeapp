@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import FindWindows from '@/components/FindWindows';
 
 type Group = {
   id: string;
@@ -14,8 +15,8 @@ type Group = {
 
 type Member = {
   user_id: string;
+  email: string;
   joined_at: string;
-  email?: string;
 };
 
 type Availability = {
@@ -46,7 +47,7 @@ export default function GroupPage() {
         return;
       }
 
-      // Загружаем группу
+      // Группа
       const { data: groupData, error: groupError } = await supabase
         .from('groups')
         .select('*')
@@ -60,7 +61,7 @@ export default function GroupPage() {
       }
       setGroup(groupData);
 
-      // Загружаем участников с email через SQL-функцию
+      // Участники
       const { data: membersData, error: membersError } = await supabase.rpc(
         'get_group_members',
         { gid: groupId }
@@ -71,17 +72,18 @@ export default function GroupPage() {
         setLoading(false);
         return;
       }
+      setMembers((membersData ?? []) as Member[]);
 
-      setMembers(membersData ?? []);
-
-      // Загружаем занятость всех участников группы
+      // Занятость всех участников группы (через функцию с security definer)
       const { data: availData, error: availError } = await supabase.rpc(
         'get_group_availability',
         { gid: groupId }
       );
 
-      if (!availError && availData) {
-        setAvailability(availData);
+      if (availError) {
+        setMessage('Ошибка загрузки занятости: ' + availError.message);
+      } else {
+        setAvailability((availData ?? []) as Availability[]);
       }
 
       setLoading(false);
@@ -137,6 +139,7 @@ export default function GroupPage() {
           ← Назад к группам
         </Link>
 
+        {/* Информация о группе */}
         <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
           <h1 className="mb-2 text-3xl font-bold text-gray-900">
             {group.name}
@@ -149,6 +152,7 @@ export default function GroupPage() {
           </p>
         </div>
 
+        {/* Участники */}
         <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
           <h2 className="mb-4 text-xl font-semibold">
             Участники ({members.length})
@@ -160,7 +164,7 @@ export default function GroupPage() {
                 key={m.user_id}
                 className="rounded border border-gray-200 px-3 py-2 text-sm text-gray-700"
               >
-                {m.email ?? m.user_id}
+                {m.email}
                 {m.user_id === group.owner_id && (
                   <span className="ml-2 rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-800">
                     владелец
@@ -171,33 +175,37 @@ export default function GroupPage() {
           </ul>
         </div>
 
+        {/* Занятость участников */}
         <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
           <h2 className="mb-4 text-xl font-semibold">
             Занятость участников ({availability.length})
           </h2>
 
           {availability.length === 0 ? (
-            <p className="text-gray-600">
-              Пока никто не добавил свою занятость.
+            <p className="text-sm text-gray-600">
+              Пока никто не ввёл свою занятость.
             </p>
           ) : (
             <ul className="space-y-2">
               {availability.map((a) => (
                 <li
                   key={a.id}
-                  className="rounded border border-gray-200 p-3 text-sm"
+                  className="rounded border border-gray-200 px-3 py-2 text-sm text-gray-700"
                 >
-                  <div className="font-medium text-gray-900">{a.title}</div>
-                  <div className="text-gray-600">
+                  <p className="font-medium text-gray-900">{a.title}</p>
+                  <p>
                     {new Date(a.start_time).toLocaleString('ru-RU')} —{' '}
                     {new Date(a.end_time).toLocaleString('ru-RU')}
-                  </div>
-                  <div className="mt-1 text-xs text-gray-500">{a.email}</div>
+                  </p>
+                  <p className="text-xs text-gray-500">{a.email}</p>
                 </li>
               ))}
             </ul>
           )}
         </div>
+
+        {/* Поиск общих окон */}
+        <FindWindows groupId={groupId} />
 
         {message && (
           <p className="mb-4 rounded bg-yellow-50 p-3 text-sm text-gray-700">
