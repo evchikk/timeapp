@@ -28,11 +28,8 @@ export default function LoginPage() {
       return;
     }
 
-    if (isSignUp) {
-      setMessage('Регистрация успешна! Проверьте почту или войдите.');
-    } else {
-      router.push('/profile');
-    }
+    // После регистрации или входа сразу идём в профиль
+    router.push('/profile');
   }
 
   return (
